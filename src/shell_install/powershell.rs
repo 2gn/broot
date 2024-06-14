@@ -23,10 +23,11 @@ const PS_FUNC: &str = r#"
 # https://github.com/Canop/broot/issues/460#issuecomment-1303005689
 Function br {
   $args = $args -join ' '
-  $cmd_file = New-TemporaryFile
+  $cmd_file = (New-TemporaryFile).FullName
+  $quoted_cmd_file = "`"$cmd_file`""
 
   $process = Start-Process -FilePath 'broot.exe' `
-                           -ArgumentList "--outcmd $($cmd_file.FullName) $args" `
+                           -ArgumentList "--outcmd $quoted_cmd_file $args" `
                            -NoNewWindow -PassThru -WorkingDirectory $PWD
 
   Wait-Process -InputObject $process #Faster than Start-Process -Wait
@@ -67,6 +68,7 @@ fn get_script_path() -> PathBuf {
 /// with --install.
 #[allow(unreachable_code, unused_variables)]
 pub fn install(si: &mut ShellInstall) -> Result<(), ShellInstallError> {
+    use std::process;
     info!("install {NAME}");
     #[cfg(unix)]
     {
@@ -83,12 +85,12 @@ pub fn install(si: &mut ShellInstall) -> Result<(), ShellInstallError> {
     };
 
     let script_path = get_script_path();
+
     si.write_script(&script_path, PS_FUNC)?;
     let link_path = get_link_path();
     si.create_link(&link_path, &script_path)?;
 
-    let escaped_path = link_path.to_string_lossy().replace(' ', "\\ ");
-    let source_line = format!(". {}", &escaped_path);
+    let source_line = format!(". \"{}\"", link_path.to_string_lossy());
 
     let sourcing_path = document_dir.join("WindowsPowerShell").join("Profile.ps1");
     if !sourcing_path.exists() {
